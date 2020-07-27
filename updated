@@ -1,0 +1,59 @@
+#!/bin/bash
+CURR_DATE=`date "+%Y-%m-%d%H:%M:%S"`
+CURR_DATE=$(echo $CURR_DATE | sed 's/[^A-Za-z0-9_]/_/g')
+#Create Command to get the list of subjects
+url="http://localhost:8081/subjects/"
+curl  $url > subjects_$CURR_DATE.dat
+#echo ls wc=l |subjects_$CURR_DATE.dat
+awk 'BEGIN{FS=","}END{print "Num subjects: "NF " Num Arrays: "NR}' subjects_$CURR_DATE.dat
+#cat subjects_$CURR_DATE.dat | while read line
+#do
+#  echo "a line: $line"
+#done
+#while IFS= read -r line; do
+#  print $line
+#done < subjects_$CURR_DATE.dat
+sed 's/"// g' subjects_$CURR_DATE.dat > modified_$CURR_DATE.dat
+#sed -i "s/[][]//g" modified_$CURR_DATE.dat
+#sed 's/[][] // g' modified_$CURR_DATE.dat > subjects_$CURR_DATE.dat
+#sed -i 's/[// g' modified_$CURR_DATE.dat
+#sed -i 's/]// g' subjects_$CURR_DATE.dat
+value=$(<modified_$CURR_DATE.dat)
+#tr -d [] $value
+#sed 's/"// g' "${value[0]}"
+#printf '%s\n' "${value[@]}"
+#printf '%s\n' "${value[0]}"
+echo  $subjects | awk -F, '{ for (i = 1; i < NF; ++i ) printf $i }'
+IFS=","
+#for i in "${value[@]}"
+#do
+IFS=', ' read -r -a array <<< "${value[0]}"
+mkdir  ./schemafolder
+
+for index in "${!array[@]}"
+do
+netvar=${array[index]}
+pats=$(echo "$netvar" | sed 's/[][]//g')
+	curl -s  $url"$pats"/versions/latest  > ./schemafolder/$pats
+        chmod 777 ./schemafolder/$pats
+done
+#printf ${!value[@]}
+#done
+chmod 777 schemafolder
+posturl="http://localhost:8081/subjects"
+for entry in "schemafolder"/*
+do
+  value=$(cat "$entry")
+  echo $value
+schemavalrec=$( cat "$entry" | jq  '.schema')
+#echo $schemavalrec
+subject=$( cat "$entry" | jq -r '.subject')
+#echo $subject
+
+schemaval={\"schema\":$schemavalrec}
+echo $schemaval
+echo "$posturl"/$subject/versions
+ curl -i \
+  -H "Content-Type:application/vnd.schemaregistry.v1+json" \
+  -X POST --data  "$schemaval" "$posturl"/$subject/versions
+done
